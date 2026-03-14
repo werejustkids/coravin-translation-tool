@@ -153,7 +153,7 @@ input[type="file"] { display: none; }
   </div>
 
   <div class="downloads" id="downloadsSection">
-    <span class="downloads-label">Download translated files</span>
+    <span class="downloads-label">Ready to download</span>
     <div class="dl-grid" id="dlGrid"></div>
   </div>
 </div>
@@ -173,7 +173,7 @@ let csvText = null;
 let parsedCSV = null;
 let detectedLangs = [];
 let selectedLangs = new Set();
-let results = {};
+
 
 document.querySelectorAll('.api-tab').forEach(tab => {
   tab.addEventListener('click', () => {
@@ -213,26 +213,61 @@ function loadFile(file) {
 }
 
 function parseAndDetect(fname) {
-  const lines = csvText.split('\n');
-  const meta = [], data = [];
-  let header = null;
-  for (const line of lines) {
-    if (line.startsWith('#')) { meta.push(line); continue; }
-    if (!header) { header = line; continue; }
-    if (line.trim()) data.push(line);
+  // Split off Smartling meta comment lines first (before CSV parsing)
+  const rawLines = csvText.split('\n');
+  const meta = [];
+  let csvBody = '';
+  for (const line of rawLines) {
+    if (line.startsWith('#')) { meta.push(line); }
+    else { csvBody += line + '\n'; }
   }
-  if (!header) { showFileError(fname, 'No header row found.'); return; }
-  const headers = parseCSVRow(header);
+
+  // Parse the CSV body properly, handling quoted multi-line fields
+  const allRows = parseFullCSV(csvBody);
+  if (allRows.length < 2) { showFileError(fname, 'No data rows found.'); return; }
+
+  const headers = allRows[0];
+  const dataRows = allRows.slice(1).filter(r => r.some(c => c.trim()));
+
   const enIdx = headers.indexOf('en');
   if (enIdx === -1) { showFileError(fname, 'No "en" column found. Is this a Smartling export?'); return; }
   const found = headers.filter(h => h !== 'en' && h !== 'block_id' && h.length === 2 && LANG_META[h]);
   if (found.length === 0) { showFileError(fname, 'No supported language columns found (nl, fr, de, it, es).'); return; }
-  parsedCSV = { meta, header, headers, data, enIdx };
+
+  // Reconstruct header line preserving original exactly
+  const headerLine = headers.map(escapeCSV).join(',');
+
+  parsedCSV = { meta, header: headerLine, headers, dataRows, enIdx };
   detectedLangs = found;
   selectedLangs = new Set(found);
-  showFileOk(fname, data.length + ' rows · ' + found.length + ' language' + (found.length > 1 ? 's' : '') + ' detected');
+  showFileOk(fname, dataRows.length + ' rows · ' + found.length + ' language' + (found.length > 1 ? 's' : '') + ' detected');
   renderLangPills();
   checkReady();
+}
+
+// Full CSV parser that handles quoted fields containing newlines and commas
+function parseFullCSV(text) {
+  const rows = [];
+  let row = [], cur = '', inQ = false;
+  for (let i = 0; i < text.length; i++) {
+    const c = text[i];
+    if (c === '"') {
+      if (inQ && text[i+1] === '"') { cur += '"'; i++; }
+      else inQ = !inQ;
+    } else if (c === ',' && !inQ) {
+      row.push(cur); cur = '';
+    } else if (c === '\r') {
+      continue;
+    } else if (c === '\n' && !inQ) {
+      row.push(cur); cur = '';
+      if (row.some(c => c !== '')) rows.push(row);
+      row = [];
+    } else {
+      cur += c;
+    }
+  }
+  if (cur || row.length) { row.push(cur); if (row.some(c => c !== '')) rows.push(row); }
+  return rows;
 }
 
 function showFileOk(name, detail) {
@@ -299,18 +334,29 @@ async function runAll() {
   document.getElementById('dlGrid').innerHTML = '';
   document.getElementById('progressBlocks').innerHTML = '';
   document.getElementById('progressSection').classList.add('visible');
-  results = {};
+
+  const { meta: metaLines, header, dataRows } = parsedCSV;
+  // Deep copy so original parsedCSV is not mutated between runs
+  const sharedRows = dataRows.map(r => [...r]);
+
+  let allOk = true;
   for (const langCode of [...selectedLangs]) {
-    const translated = await translateLanguage(langCode);
-    if (translated) { results[langCode] = translated; addDownloadButton(langCode); }
+    const ok = await translateIntoRows(langCode, sharedRows);
+    if (!ok) { allOk = false; break; }
   }
-  document.getElementById('downloadsSection').classList.add('visible');
+
+  if (allOk) {
+    const mergedCSV = [...metaLines, header, ...sharedRows.map(row => row.map(escapeCSV).join(','))].join('\n');
+    addSingleDownloadButton(mergedCSV);
+    document.getElementById('downloadsSection').classList.add('visible');
+  }
+
   document.getElementById('runBtn').disabled = false;
 }
 
-async function translateLanguage(langCode) {
+async function translateIntoRows(langCode, sharedRows) {
   const m = LANG_META[langCode];
-  const { headers, data, enIdx } = parsedCSV;
+  const { headers, dataRows, enIdx } = parsedCSV;
   const langIdx = headers.indexOf(langCode);
   const block = document.createElement('div');
   block.className = 'progress-lang-block';
@@ -318,19 +364,16 @@ async function translateLanguage(langCode) {
   document.getElementById('progressBlocks').appendChild(block);
   const CHUNK = 8;
   const chunks = [];
-  for (let i = 0; i < data.length; i += CHUNK) chunks.push(data.slice(i, i + CHUNK));
-  const outputRows = new Array(data.length);
+  for (let i = 0; i < sharedRows.length; i += CHUNK) chunks.push({ start: i, rows: sharedRows.slice(i, i + CHUNK) });
   let completed = 0;
   for (let ci = 0; ci < chunks.length; ci++) {
+    const { start, rows } = chunks[ci];
     setStatus(langCode, 'Chunk ' + (ci+1) + ' of ' + chunks.length + '...');
-    const rows = chunks[ci].map(l => parseCSVRow(l));
     const payload = rows.map((row, ri) => ({ i: ri, blockId: row[0]||'', en: row[enIdx]||'', existing: row[langIdx]||'' }));
     try {
       const translations = await callAPI(payload, langCode, m);
       rows.forEach((row, ri) => {
-        const newRow = [...row];
-        newRow[langIdx] = translations[ri] !== undefined ? translations[ri] : row[langIdx];
-        outputRows[ci * CHUNK + ri] = newRow;
+        if (translations[ri] !== undefined) sharedRows[start + ri][langIdx] = translations[ri];
       });
       completed++;
       const pct = Math.round((completed / chunks.length) * 100);
@@ -338,14 +381,12 @@ async function translateLanguage(langCode) {
       document.getElementById('pct-' + langCode).textContent = pct + '%';
     } catch(err) {
       setStatus(langCode, 'Error: ' + err.message, true);
-      return null;
+      return false;
     }
   }
   document.getElementById('bar-' + langCode).classList.add('complete');
-  setStatus(langCode, 'Complete — ' + data.length + ' rows translated.');
-  const { meta: metaLines, header } = parsedCSV;
-  const outLines = [...metaLines, header, ...outputRows.filter(Boolean).map(row => row.map(escapeCSV).join(','))];
-  return outLines.join('\n');
+  setStatus(langCode, 'Complete.');
+  return true;
 }
 
 function setStatus(langCode, msg, isError) {
@@ -394,13 +435,15 @@ function parseTranslationResponse(text) {
   return results;
 }
 
-function addDownloadButton(langCode) {
-  const m = LANG_META[langCode];
+function addSingleDownloadButton(csvContent) {
   const btn = document.createElement('button');
   btn.className = 'dl-btn';
-  btn.innerHTML = '<span>' + m.flag + ' ' + m.name + '</span><svg viewBox="0 0 24 24" stroke-width="1.5"><path stroke-linecap="round" stroke-linejoin="round" d="M3 16.5v2.25A2.25 2.25 0 005.25 21h13.5A2.25 2.25 0 0021 18.75V16.5M16.5 12L12 16.5m0 0L7.5 12m4.5 4.5V3"/></svg>';
+  btn.innerHTML = '<span>Download translated CSV</span><svg viewBox="0 0 24 24" stroke-width="1.5"><path stroke-linecap="round" stroke-linejoin="round" d="M3 16.5v2.25A2.25 2.25 0 005.25 21h13.5A2.25 2.25 0 0021 18.75V16.5M16.5 12L12 16.5m0 0L7.5 12m4.5 4.5V3"/></svg>';
   btn.addEventListener('click', () => {
-    const a = Object.assign(document.createElement('a'), { href: URL.createObjectURL(new Blob([results[langCode]], { type: 'text/csv;charset=utf-8;' })), download: 'translated_' + langCode + '_' + Date.now() + '.csv' });
+    const a = Object.assign(document.createElement('a'), {
+      href: URL.createObjectURL(new Blob([csvContent], { type: 'text/csv;charset=utf-8;' })),
+      download: 'translated_all_' + Date.now() + '.csv'
+    });
     a.click();
   });
   document.getElementById('dlGrid').appendChild(btn);
