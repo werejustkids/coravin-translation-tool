@@ -244,8 +244,9 @@ function parseAndDetect(fname) {
   const found = headers.filter(h => h !== 'en' && h !== 'block_id' && h.length === 2 && LANG_META[h]);
   if (found.length === 0) { showFileError(fname, 'No supported language columns found (nl, fr, de, it, es).'); return; }
 
-  // Reconstruct header line preserving original exactly
-  const headerLine = headers.map(escapeCSV).join(',');
+  // Reconstruct header line — rename 'en' to 'source' as required by Klaviyo import
+  const outputHeaders = headers.map(h => h === 'en' ? 'source' : h);
+  const headerLine = outputHeaders.map(escapeCSV).join(',');
 
   parsedCSV = { meta, metaBlock, header: headerLine, headers, dataRows, enIdx, lineEnding, trailingNewline };
   detectedLangs = found;
