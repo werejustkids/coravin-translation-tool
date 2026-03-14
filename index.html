@@ -87,6 +87,77 @@ h1 { font-family: 'Cormorant Garamond', Georgia, serif; font-size: 40px; font-we
 .divider { height: 1px; background: var(--border); margin: 2rem 0; }
 input[type="file"] { display: none; }
 @media (max-width: 480px) { h1 { font-size: 30px; } .masthead { flex-direction: column; } }
+
+  .instructions {
+    margin-bottom: 2rem;
+    background: white;
+    border: 1px solid var(--border);
+    border-radius: 6px;
+    overflow: hidden;
+  }
+
+  .instructions-toggle {
+    width: 100%;
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    padding: 1rem 1.25rem;
+    background: none;
+    border: none;
+    cursor: pointer;
+    text-align: left;
+    gap: 8px;
+  }
+
+  .instructions-toggle:hover { background: rgba(184,147,90,0.04); }
+
+  .instructions-title {
+    font-family: 'Cormorant Garamond', Georgia, serif;
+    font-size: 11px;
+    font-weight: 600;
+    letter-spacing: 0.18em;
+    text-transform: uppercase;
+    color: var(--text-muted);
+  }
+
+  .instructions-chevron {
+    width: 14px;
+    height: 14px;
+    stroke: var(--text-muted);
+    fill: none;
+    flex-shrink: 0;
+    transition: transform 0.2s ease;
+  }
+
+  .instructions.open .instructions-chevron {
+    transform: rotate(180deg);
+  }
+
+  .instructions-body {
+    display: none;
+    padding: 0 1.25rem 1.25rem;
+    border-top: 1px solid var(--border);
+  }
+
+  .instructions.open .instructions-body { display: block; }
+
+  .instructions ol {
+    padding-left: 1.1rem;
+    margin: 0.85rem 0 0;
+  }
+
+  .instructions li {
+    font-size: 13px;
+    color: var(--text-mid);
+    line-height: 1.6;
+    padding: 3px 0;
+  }
+
+  .instructions li::marker {
+    color: var(--gold);
+    font-family: 'Cormorant Garamond', Georgia, serif;
+    font-size: 13px;
+  }
 </style>
 </head>
 <body>
@@ -95,7 +166,7 @@ input[type="file"] { display: none; }
     <div class="masthead-left">
       <span class="wordmark">Coravin</span>
       <h1>Klaviyo<br>Translation Tool</h1>
-      <p class="tagline">Upload a Smartling CSV export, select languages, and download ready-to-import translated files.</p>
+      <p class="tagline">Upload a Klaviyo CSV export, select languages, and download a ready-to-import translated file.</p>
     </div>
     <div class="masthead-crest">
       <svg viewBox="0 0 26 26" fill="none" xmlns="http://www.w3.org/2000/svg">
@@ -106,11 +177,32 @@ input[type="file"] { display: none; }
     </div>
   </div>
 
+  <div class="instructions" id="instructions">
+    <button class="instructions-toggle" onclick="toggleInstructions()" aria-expanded="false">
+      <span class="instructions-title">How to use</span>
+      <svg class="instructions-chevron" viewBox="0 0 24 24" stroke-width="1.5"><path stroke-linecap="round" stroke-linejoin="round" d="M19.5 8.25l-7.5 7.5-7.5-7.5"/></svg>
+    </button>
+    <div class="instructions-body">
+      <ol>
+        <li>Clone email to "Coravin EU" Klaviyo account and choose correct segments</li>
+        <li>Open Drag &amp; Drop editor and replace footer with saved block "Live text footer"</li>
+        <li>Verify all links work on EU instance of Shopify</li>
+        <li>Click Translations in top right corner and ensure Dutch, French, German, Italian and Spanish are selected</li>
+        <li>Translate and select the three dots in top right corner, click Export CSV</li>
+        <li>Under "Select export format", choose the regular "CSV"</li>
+        <li>Click Export and upload to this tool</li>
+        <li>Ensure API key is entered, and click Translate</li>
+        <li>After it's done, download the file and import back into Klaviyo (again under three dots in top right corner)</li>
+        <li>Verify all fields and links &mdash; then it's ready!</li>
+      </ol>
+    </div>
+  </div>
+
   <div class="section">
     <span class="section-label">API key</span>
     <div class="api-tabs">
-      <button class="api-tab active" data-provider="anthropic">Anthropic (Claude)</button>
-      <button class="api-tab" data-provider="openai">OpenAI (GPT-5.4)</button>
+      <button class="api-tab active" data-provider="openai">OpenAI (GPT-5.4)</button>
+      <button class="api-tab" data-provider="anthropic">Anthropic (Claude)</button>
     </div>
     <div class="api-input-wrap">
       <input class="api-input" id="apiKey" type="password" placeholder="Paste your API key here" autocomplete="off">
@@ -118,7 +210,7 @@ input[type="file"] { display: none; }
         <svg viewBox="0 0 24 24" stroke-width="1.5"><path stroke-linecap="round" stroke-linejoin="round" d="M2.036 12.322a1.012 1.012 0 010-.639C3.423 7.51 7.36 4.5 12 4.5c4.638 0 8.573 3.007 9.963 7.178.07.207.07.431 0 .639C20.577 16.49 16.64 19.5 12 19.5c-4.638 0-8.573-3.007-9.963-7.178z"/><path stroke-linecap="round" stroke-linejoin="round" d="M15 12a3 3 0 11-6 0 3 3 0 016 0z"/></svg>
       </button>
     </div>
-    <p class="api-hint" id="apiHint">Get your key at <a href="https://console.anthropic.com/keys" target="_blank">console.anthropic.com</a>. Keys are never stored or sent anywhere except the API.</p>
+    <p class="api-hint" id="apiHint">Get your key at <a href="https://platform.openai.com/api-keys" target="_blank">platform.openai.com</a>. Keys are never stored or sent anywhere except the API.</p>
   </div>
 
   <div class="section">
@@ -127,7 +219,7 @@ input[type="file"] { display: none; }
       <div class="drop-icon">
         <svg viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" d="M19.5 14.25v-2.625a3.375 3.375 0 00-3.375-3.375h-1.5A1.125 1.125 0 0113.5 7.125v-1.5a3.375 3.375 0 00-3.375-3.375H8.25m2.25 0H5.625c-.621 0-1.125.504-1.125 1.125v17.25c0 .621.504 1.125 1.125 1.125h12.75c.621 0 1.125-.504 1.125-1.125V11.25a9 9 0 00-9-9z"/></svg>
       </div>
-      <p class="drop-text">Drop your Smartling CSV here</p>
+      <p class="drop-text">Drop your Klaviyo CSV here</p>
       <p class="drop-hint">or click to browse</p>
     </div>
     <input type="file" id="fileInput" accept=".csv">
@@ -167,7 +259,7 @@ const LANG_META = {
   es: { name: 'Spanish', flag: '🇪🇸', domain: 'coravin.com.es', tone: 'Use a natural, persuasive marketing tone appropriate for Spanish.' },
 };
 
-let provider = 'anthropic';
+let provider = 'openai';
 let apiKey = '';
 let csvText = null;
 let parsedCSV = null;
@@ -184,7 +276,7 @@ document.querySelectorAll('.api-tab').forEach(tab => {
     apiKey = '';
     const hint = document.getElementById('apiHint');
     if (provider === 'anthropic') {
-      hint.innerHTML = 'Get your key at <a href="https://console.anthropic.com/keys" target="_blank">console.anthropic.com</a>. Keys are never stored or sent anywhere except the API.';
+      hint.innerHTML = 'Get your key at <a href="https://platform.openai.com/api-keys" target="_blank">platform.openai.com</a>. Keys are never stored or sent anywhere except the API.';
     } else {
       hint.innerHTML = 'Get your key at <a href="https://platform.openai.com/api-keys" target="_blank">platform.openai.com</a>. Keys are never stored or sent anywhere except the API.';
     }
@@ -214,7 +306,7 @@ function loadFile(file) {
 }
 
 // ── CSV parsing ──
-// Klaviyo Simple CSV: UTF-8 with BOM, CRLF, no directives
+// Klaviyo CSV: UTF-8 with BOM, CRLF, no directives
 // Header: block_id, source, [lang codes...]
 function parseAndDetect(fname) {
   // Strip BOM if present
@@ -232,8 +324,8 @@ function parseAndDetect(fname) {
   const dataRows = allRows.slice(1).filter(r => r.some(c => c.trim()));
 
   // Validate required columns
-  if (!headers.includes('block_id')) { showFileError(fname, 'Missing block_id column. Is this a Klaviyo Simple CSV export?'); return; }
-  if (!headers.includes('source')) { showFileError(fname, 'Missing source column. Please export using the Simple CSV option in Klaviyo.'); return; }
+  if (!headers.includes('block_id')) { showFileError(fname, 'Missing block_id column. Please export using the CSV option in Klaviyo.'); return; }
+  if (!headers.includes('source')) { showFileError(fname, 'Missing source column. Please export using the CSV option in Klaviyo.'); return; }
 
   const sourceIdx = headers.indexOf('source');
 
@@ -350,7 +442,7 @@ async function runAll() {
   }
 
   if (allOk) {
-    // Output Simple CSV: UTF-8 with BOM, CRLF, header row, data rows
+    // Output CSV: UTF-8 with BOM, CRLF, header row, data rows
     // Preserve original structure exactly — only translated cells change
     const headerLine = headers.join(',');
     const dataSection = [headerLine, ...sharedRows.map(row => row.map(escapeCSV).join(','))].join(lineEnding);
@@ -454,6 +546,13 @@ function addDownloadButton(csvContent) {
 function escapeCSV(val) {
   const s = String(val ?? '');
   return (s.includes(',') || s.includes('"') || s.includes('\n') || s.includes('\r')) ? '"' + s.replace(/"/g, '""') + '"' : s;
+}
+
+function toggleInstructions() {
+  const el = document.getElementById('instructions');
+  const btn = el.querySelector('.instructions-toggle');
+  const isOpen = el.classList.toggle('open');
+  btn.setAttribute('aria-expanded', isOpen);
 }
 </script>
 
