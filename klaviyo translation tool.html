@@ -1,0 +1,429 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Coravin — Klaviyo Translation Tool</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link href="https://fonts.googleapis.com/css2?family=Cormorant+Garamond:ital,wght@0,400;0,500;0,600;1,400&family=Neuton:wght@300;400&display=swap" rel="stylesheet">
+<style>
+*, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
+:root {
+  --cream: #F2EDE4; --cream-dark: #E5DDD0; --gold: #B8935A; --gold-light: #D4AF7A;
+  --green: #2D4A35; --green-mid: #3D6347; --green-light: #EBF0EC;
+  --text-dark: #1A1612; --text-mid: #4A3F32; --text-soft: #7A6E5F; --text-muted: #A89E8E;
+  --border: rgba(184,147,90,0.25); --border-hover: rgba(184,147,90,0.55);
+  --success: #2D4A35; --error: #6B2737;
+}
+html, body { min-height: 100%; background: var(--cream); color: var(--text-dark); font-family: 'Neuton', Georgia, serif; font-weight: 300; font-size: 16px; line-height: 1.6; }
+.page { max-width: 640px; margin: 0 auto; padding: 0 1.5rem 5rem; }
+.masthead { padding: 2.5rem 0 2rem; border-bottom: 1px solid var(--border); margin-bottom: 2.5rem; display: flex; align-items: flex-start; justify-content: space-between; gap: 1rem; }
+.masthead-left { flex: 1; }
+.wordmark { font-family: 'Cormorant Garamond', Georgia, serif; font-size: 10px; font-weight: 600; letter-spacing: 0.25em; text-transform: uppercase; color: var(--gold); margin-bottom: 0.6rem; display: block; }
+h1 { font-family: 'Cormorant Garamond', Georgia, serif; font-size: 40px; font-weight: 400; line-height: 1.05; color: var(--text-dark); margin-bottom: 0.5rem; }
+.tagline { font-size: 14px; color: var(--text-soft); line-height: 1.5; font-weight: 300; }
+.masthead-crest { width: 56px; height: 56px; border: 1px solid var(--border); border-radius: 50%; display: flex; align-items: center; justify-content: center; flex-shrink: 0; margin-top: 4px; }
+.masthead-crest svg { width: 26px; height: 26px; }
+.section { margin-bottom: 2rem; }
+.section-label { display: block; font-family: 'Cormorant Garamond', Georgia, serif; font-size: 11px; font-weight: 600; letter-spacing: 0.18em; text-transform: uppercase; color: var(--text-muted); margin-bottom: 0.75rem; }
+.api-tabs { display: flex; gap: 0; margin-bottom: 10px; border-bottom: 1px solid var(--border); }
+.api-tab { padding: 7px 16px; font-size: 12px; font-family: 'Cormorant Garamond', Georgia, serif; letter-spacing: 0.06em; background: none; border: none; border-bottom: 2px solid transparent; color: var(--text-muted); cursor: pointer; transition: all 0.15s; margin-bottom: -1px; }
+.api-tab:hover { color: var(--text-mid); }
+.api-tab.active { color: var(--gold); border-bottom-color: var(--gold); font-weight: 500; }
+.api-input-wrap { position: relative; }
+.api-input { width: 100%; padding: 10px 40px 10px 12px; font-size: 13px; font-family: 'Neuton', Georgia, serif; background: white; border: 1px solid var(--border); border-radius: 4px; color: var(--text-dark); outline: none; transition: border-color 0.15s; letter-spacing: 0.03em; }
+.api-input:focus { border-color: var(--gold); }
+.api-input::placeholder { color: var(--text-muted); }
+.api-toggle { position: absolute; right: 10px; top: 50%; transform: translateY(-50%); background: none; border: none; cursor: pointer; color: var(--text-muted); padding: 2px; }
+.api-toggle:hover { color: var(--text-mid); }
+.api-toggle svg { width: 15px; height: 15px; stroke: currentColor; fill: none; }
+.api-hint { font-size: 11px; color: var(--text-muted); margin-top: 6px; line-height: 1.4; }
+.api-hint a { color: var(--gold); text-decoration: none; }
+.api-hint a:hover { text-decoration: underline; }
+.drop-zone { border: 1px dashed var(--border); border-radius: 6px; padding: 2.5rem 1.5rem; text-align: center; cursor: pointer; transition: all 0.2s; background: white; }
+.drop-zone:hover, .drop-zone.dragover { border-color: var(--gold); background: rgba(184,147,90,0.03); }
+.drop-icon { width: 44px; height: 44px; margin: 0 auto 12px; border: 1px solid var(--border); border-radius: 6px; display: flex; align-items: center; justify-content: center; }
+.drop-icon svg { width: 20px; height: 20px; stroke: var(--text-muted); fill: none; stroke-width: 1.5; }
+.drop-text { font-size: 14px; color: var(--text-mid); margin-bottom: 3px; }
+.drop-hint { font-size: 12px; color: var(--text-muted); }
+.file-status { display: none; margin-top: 10px; padding: 10px 14px; border-radius: 4px; font-size: 12px; align-items: flex-start; gap: 10px; }
+.file-status.visible { display: flex; }
+.file-status.loaded { background: var(--green-light); border: 1px solid rgba(45,74,53,0.2); color: var(--success); }
+.file-status.error-state { background: #F8EDEE; border: 1px solid rgba(107,39,55,0.2); color: var(--error); }
+.file-status svg { width: 14px; height: 14px; stroke: currentColor; fill: none; flex-shrink: 0; margin-top: 1px; }
+.file-status-text { flex: 1; line-height: 1.5; }
+.file-status-name { font-weight: 500; }
+.detected-langs { display: none; margin-top: 1rem; padding: 14px; background: white; border: 1px solid var(--border); border-radius: 6px; }
+.detected-langs.visible { display: block; }
+.detected-langs-title { font-size: 11px; letter-spacing: 0.1em; text-transform: uppercase; color: var(--text-muted); font-family: 'Cormorant Garamond', Georgia, serif; font-weight: 600; margin-bottom: 10px; }
+.lang-pills { display: flex; flex-wrap: wrap; gap: 6px; }
+.lang-pill { display: flex; align-items: center; gap: 6px; padding: 5px 12px 5px 8px; border-radius: 20px; font-size: 12px; background: var(--cream-dark); color: var(--text-mid); border: 1px solid var(--border); cursor: pointer; user-select: none; }
+.lang-pill .flag { font-size: 14px; line-height: 1; }
+.lang-pill.selected { background: var(--green); color: var(--cream); border-color: var(--green); }
+.lang-pill input[type="checkbox"] { width: 13px; height: 13px; accent-color: var(--gold); cursor: pointer; margin: 0; }
+.all-toggle { display: inline-flex; align-items: center; gap: 6px; font-size: 12px; color: var(--text-soft); cursor: pointer; margin-top: 10px; border-top: 1px solid var(--border); padding-top: 10px; width: 100%; }
+.all-toggle input { accent-color: var(--gold); cursor: pointer; }
+.run-btn { width: 100%; padding: 14px; font-size: 13px; font-family: 'Cormorant Garamond', Georgia, serif; font-weight: 600; letter-spacing: 0.15em; text-transform: uppercase; background: var(--green); color: var(--cream); border: none; border-radius: 4px; cursor: pointer; transition: all 0.2s; margin-top: 0.25rem; }
+.run-btn:hover:not(:disabled) { background: var(--green-mid); }
+.run-btn:disabled { opacity: 0.35; cursor: not-allowed; }
+.progress-section { display: none; margin-top: 2rem; }
+.progress-section.visible { display: block; }
+.progress-lang-block { margin-bottom: 1.5rem; }
+.progress-lang-header { display: flex; justify-content: space-between; align-items: center; margin-bottom: 6px; }
+.progress-lang-name { font-size: 13px; font-weight: 400; color: var(--text-mid); display: flex; align-items: center; gap: 6px; }
+.progress-pct { font-size: 12px; color: var(--gold); }
+.progress-track { height: 2px; background: var(--cream-dark); border-radius: 2px; margin-bottom: 8px; overflow: hidden; }
+.progress-fill { height: 2px; background: var(--gold); border-radius: 2px; width: 0%; transition: width 0.35s ease; }
+.progress-fill.complete { background: var(--green); }
+.status-line { font-size: 11px; color: var(--text-muted); }
+.status-line.error { color: var(--error); }
+.downloads { display: none; margin-top: 2rem; }
+.downloads.visible { display: block; }
+.downloads-label { font-family: 'Cormorant Garamond', Georgia, serif; font-size: 11px; font-weight: 600; letter-spacing: 0.18em; text-transform: uppercase; color: var(--text-muted); margin-bottom: 10px; display: block; }
+.dl-grid { display: flex; flex-direction: column; gap: 6px; }
+.dl-btn { display: flex; align-items: center; justify-content: space-between; padding: 11px 14px; font-size: 13px; font-family: 'Neuton', Georgia, serif; font-weight: 400; background: white; color: var(--green); border: 1px solid rgba(45,74,53,0.3); border-radius: 4px; cursor: pointer; transition: all 0.15s; text-align: left; }
+.dl-btn:hover { background: var(--green-light); }
+.dl-btn svg { width: 14px; height: 14px; stroke: currentColor; fill: none; flex-shrink: 0; }
+.divider { height: 1px; background: var(--border); margin: 2rem 0; }
+input[type="file"] { display: none; }
+@media (max-width: 480px) { h1 { font-size: 30px; } .masthead { flex-direction: column; } }
+</style>
+</head>
+<body>
+<div class="page">
+  <div class="masthead">
+    <div class="masthead-left">
+      <span class="wordmark">Coravin</span>
+      <h1>Klaviyo<br>Translation Tool</h1>
+      <p class="tagline">Upload a Smartling CSV export, select languages, and download ready-to-import translated files.</p>
+    </div>
+    <div class="masthead-crest">
+      <svg viewBox="0 0 26 26" fill="none" xmlns="http://www.w3.org/2000/svg">
+        <circle cx="13" cy="13" r="11.5" stroke="#B8935A" stroke-width="0.75"/>
+        <path d="M13 4 C13 4 9 9 9 14 C9 17.3 10.8 20 13 21 C15.2 20 17 17.3 17 14 C17 9 13 4 13 4Z" stroke="#B8935A" stroke-width="0.75" fill="none"/>
+        <line x1="13" y1="4" x2="13" y2="22" stroke="#B8935A" stroke-width="0.5"/>
+      </svg>
+    </div>
+  </div>
+
+  <div class="section">
+    <span class="section-label">API key</span>
+    <div class="api-tabs">
+      <button class="api-tab active" data-provider="anthropic">Anthropic (Claude)</button>
+      <button class="api-tab" data-provider="openai">OpenAI (GPT-4o)</button>
+    </div>
+    <div class="api-input-wrap">
+      <input class="api-input" id="apiKey" type="password" placeholder="Paste your API key here" autocomplete="off">
+      <button class="api-toggle" id="toggleKey" title="Show/hide key">
+        <svg viewBox="0 0 24 24" stroke-width="1.5"><path stroke-linecap="round" stroke-linejoin="round" d="M2.036 12.322a1.012 1.012 0 010-.639C3.423 7.51 7.36 4.5 12 4.5c4.638 0 8.573 3.007 9.963 7.178.07.207.07.431 0 .639C20.577 16.49 16.64 19.5 12 19.5c-4.638 0-8.573-3.007-9.963-7.178z"/><path stroke-linecap="round" stroke-linejoin="round" d="M15 12a3 3 0 11-6 0 3 3 0 016 0z"/></svg>
+      </button>
+    </div>
+    <p class="api-hint" id="apiHint">Get your key at <a href="https://console.anthropic.com/keys" target="_blank">console.anthropic.com</a>. Keys are never stored or sent anywhere except the API.</p>
+  </div>
+
+  <div class="section">
+    <span class="section-label">CSV file</span>
+    <div class="drop-zone" id="dropZone">
+      <div class="drop-icon">
+        <svg viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" d="M19.5 14.25v-2.625a3.375 3.375 0 00-3.375-3.375h-1.5A1.125 1.125 0 0113.5 7.125v-1.5a3.375 3.375 0 00-3.375-3.375H8.25m2.25 0H5.625c-.621 0-1.125.504-1.125 1.125v17.25c0 .621.504 1.125 1.125 1.125h12.75c.621 0 1.125-.504 1.125-1.125V11.25a9 9 0 00-9-9z"/></svg>
+      </div>
+      <p class="drop-text">Drop your Smartling CSV here</p>
+      <p class="drop-hint">or click to browse</p>
+    </div>
+    <input type="file" id="fileInput" accept=".csv">
+    <div class="file-status" id="fileStatus">
+      <svg viewBox="0 0 24 24" stroke-width="1.5" id="fileStatusIcon"><path stroke-linecap="round" stroke-linejoin="round" d="M9 12l2 2 4-4m6 2a9 9 0 11-18 0 9 9 0 0118 0z"/></svg>
+      <div class="file-status-text">
+        <div class="file-status-name" id="fileStatusName"></div>
+        <div id="fileStatusDetail"></div>
+      </div>
+    </div>
+    <div class="detected-langs" id="detectedLangs">
+      <div class="detected-langs-title">Languages detected in file</div>
+      <div class="lang-pills" id="langPills"></div>
+      <label class="all-toggle"><input type="checkbox" id="allLangsToggle"> Translate all languages</label>
+    </div>
+  </div>
+
+  <button class="run-btn" id="runBtn" disabled>Translate</button>
+
+  <div class="progress-section" id="progressSection">
+    <div class="divider"></div>
+    <div id="progressBlocks"></div>
+  </div>
+
+  <div class="downloads" id="downloadsSection">
+    <span class="downloads-label">Download translated files</span>
+    <div class="dl-grid" id="dlGrid"></div>
+  </div>
+</div>
+
+<script>
+const LANG_META = {
+  nl: { name: 'Dutch',   flag: '🇳🇱', domain: 'coravin.nl',     tone: 'Use informal language (je/jij, not u).' },
+  fr: { name: 'French',  flag: '🇫🇷', domain: 'coravin.fr',     tone: 'Use a natural, persuasive marketing tone appropriate for French.' },
+  de: { name: 'German',  flag: '🇩🇪', domain: 'coravin.de',     tone: 'Use a natural, persuasive marketing tone appropriate for German.' },
+  it: { name: 'Italian', flag: '🇮🇹', domain: 'coravin.it',     tone: 'Use a natural, persuasive marketing tone appropriate for Italian.' },
+  es: { name: 'Spanish', flag: '🇪🇸', domain: 'coravin.com.es', tone: 'Use a natural, persuasive marketing tone appropriate for Spanish.' },
+};
+
+let provider = 'anthropic';
+let apiKey = '';
+let csvText = null;
+let parsedCSV = null;
+let detectedLangs = [];
+let selectedLangs = new Set();
+let results = {};
+
+document.querySelectorAll('.api-tab').forEach(tab => {
+  tab.addEventListener('click', () => {
+    document.querySelectorAll('.api-tab').forEach(t => t.classList.remove('active'));
+    tab.classList.add('active');
+    provider = tab.dataset.provider;
+    document.getElementById('apiKey').value = '';
+    apiKey = '';
+    const hint = document.getElementById('apiHint');
+    if (provider === 'anthropic') {
+      hint.innerHTML = 'Get your key at <a href="https://console.anthropic.com/keys" target="_blank">console.anthropic.com</a>. Keys are never stored or sent anywhere except the API.';
+    } else {
+      hint.innerHTML = 'Get your key at <a href="https://platform.openai.com/api-keys" target="_blank">platform.openai.com</a>. Keys are never stored or sent anywhere except the API.';
+    }
+    checkReady();
+  });
+});
+
+document.getElementById('apiKey').addEventListener('input', e => { apiKey = e.target.value.trim(); checkReady(); });
+document.getElementById('toggleKey').addEventListener('click', () => {
+  const inp = document.getElementById('apiKey');
+  inp.type = inp.type === 'password' ? 'text' : 'password';
+});
+
+const dropZone = document.getElementById('dropZone');
+const fileInput = document.getElementById('fileInput');
+dropZone.addEventListener('click', () => fileInput.click());
+dropZone.addEventListener('dragover', e => { e.preventDefault(); dropZone.classList.add('dragover'); });
+dropZone.addEventListener('dragleave', () => dropZone.classList.remove('dragover'));
+dropZone.addEventListener('drop', e => { e.preventDefault(); dropZone.classList.remove('dragover'); if (e.dataTransfer.files[0]) loadFile(e.dataTransfer.files[0]); });
+fileInput.addEventListener('change', () => { if (fileInput.files[0]) loadFile(fileInput.files[0]); });
+
+function loadFile(file) {
+  const reader = new FileReader();
+  reader.onload = e => { csvText = e.target.result; parseAndDetect(file.name); };
+  reader.readAsText(file, 'UTF-8');
+}
+
+function parseAndDetect(fname) {
+  const lines = csvText.split('\n');
+  const meta = [], data = [];
+  let header = null;
+  for (const line of lines) {
+    if (line.startsWith('#')) { meta.push(line); continue; }
+    if (!header) { header = line; continue; }
+    if (line.trim()) data.push(line);
+  }
+  if (!header) { showFileError(fname, 'No header row found.'); return; }
+  const headers = parseCSVRow(header);
+  const enIdx = headers.indexOf('en');
+  if (enIdx === -1) { showFileError(fname, 'No "en" column found. Is this a Smartling export?'); return; }
+  const found = headers.filter(h => h !== 'en' && h !== 'block_id' && h.length === 2 && LANG_META[h]);
+  if (found.length === 0) { showFileError(fname, 'No supported language columns found (nl, fr, de, it, es).'); return; }
+  parsedCSV = { meta, header, headers, data, enIdx };
+  detectedLangs = found;
+  selectedLangs = new Set(found);
+  showFileOk(fname, data.length + ' rows · ' + found.length + ' language' + (found.length > 1 ? 's' : '') + ' detected');
+  renderLangPills();
+  checkReady();
+}
+
+function showFileOk(name, detail) {
+  const el = document.getElementById('fileStatus');
+  el.className = 'file-status visible loaded';
+  document.getElementById('fileStatusIcon').innerHTML = '<path stroke-linecap="round" stroke-linejoin="round" d="M9 12l2 2 4-4m6 2a9 9 0 11-18 0 9 9 0 0118 0z"/>';
+  document.getElementById('fileStatusName').textContent = name;
+  document.getElementById('fileStatusDetail').textContent = detail;
+}
+
+function showFileError(name, detail) {
+  const el = document.getElementById('fileStatus');
+  el.className = 'file-status visible error-state';
+  document.getElementById('fileStatusIcon').innerHTML = '<path stroke-linecap="round" stroke-linejoin="round" d="M12 9v3.75m-9.303 3.376c-.866 1.5.217 3.374 1.948 3.374h14.71c1.73 0 2.813-1.874 1.948-3.374L13.949 3.378c-.866-1.5-3.032-1.5-3.898 0L2.697 16.126zM12 15.75h.007v.008H12v-.008z"/>';
+  document.getElementById('fileStatusName').textContent = name;
+  document.getElementById('fileStatusDetail').textContent = detail;
+  document.getElementById('detectedLangs').classList.remove('visible');
+  parsedCSV = null; checkReady();
+}
+
+function renderLangPills() {
+  const container = document.getElementById('langPills');
+  container.innerHTML = '';
+  detectedLangs.forEach(code => {
+    const m = LANG_META[code];
+    const pill = document.createElement('label');
+    pill.className = 'lang-pill' + (selectedLangs.has(code) ? ' selected' : '');
+    const cb = document.createElement('input');
+    cb.type = 'checkbox';
+    cb.checked = selectedLangs.has(code);
+    cb.addEventListener('change', () => {
+      if (cb.checked) selectedLangs.add(code); else selectedLangs.delete(code);
+      pill.className = 'lang-pill' + (selectedLangs.has(code) ? ' selected' : '');
+      document.getElementById('allLangsToggle').checked = selectedLangs.size === detectedLangs.length;
+      checkReady();
+    });
+    pill.appendChild(cb);
+    const flag = document.createElement('span'); flag.className = 'flag'; flag.textContent = m.flag;
+    const name = document.createElement('span'); name.textContent = m.name;
+    pill.appendChild(flag); pill.appendChild(name);
+    container.appendChild(pill);
+  });
+  const allToggle = document.getElementById('allLangsToggle');
+  allToggle.checked = true;
+  allToggle.onchange = null;
+  allToggle.addEventListener('change', e => {
+    if (e.target.checked) detectedLangs.forEach(c => selectedLangs.add(c)); else selectedLangs.clear();
+    renderLangPills();
+    document.getElementById('allLangsToggle').checked = e.target.checked;
+    checkReady();
+  });
+  document.getElementById('detectedLangs').classList.add('visible');
+}
+
+function checkReady() {
+  document.getElementById('runBtn').disabled = !(apiKey && parsedCSV && selectedLangs.size > 0);
+}
+
+document.getElementById('runBtn').addEventListener('click', runAll);
+
+async function runAll() {
+  document.getElementById('runBtn').disabled = true;
+  document.getElementById('downloadsSection').classList.remove('visible');
+  document.getElementById('dlGrid').innerHTML = '';
+  document.getElementById('progressBlocks').innerHTML = '';
+  document.getElementById('progressSection').classList.add('visible');
+  results = {};
+  for (const langCode of [...selectedLangs]) {
+    const translated = await translateLanguage(langCode);
+    if (translated) { results[langCode] = translated; addDownloadButton(langCode); }
+  }
+  document.getElementById('downloadsSection').classList.add('visible');
+  document.getElementById('runBtn').disabled = false;
+}
+
+async function translateLanguage(langCode) {
+  const m = LANG_META[langCode];
+  const { headers, data, enIdx } = parsedCSV;
+  const langIdx = headers.indexOf(langCode);
+  const block = document.createElement('div');
+  block.className = 'progress-lang-block';
+  block.innerHTML = '<div class="progress-lang-header"><span class="progress-lang-name">' + m.flag + ' ' + m.name + '</span><span class="progress-pct" id="pct-' + langCode + '">0%</span></div><div class="progress-track"><div class="progress-fill" id="bar-' + langCode + '"></div></div><div class="status-line" id="status-' + langCode + '">Starting...</div>';
+  document.getElementById('progressBlocks').appendChild(block);
+  const CHUNK = 8;
+  const chunks = [];
+  for (let i = 0; i < data.length; i += CHUNK) chunks.push(data.slice(i, i + CHUNK));
+  const outputRows = new Array(data.length);
+  let completed = 0;
+  for (let ci = 0; ci < chunks.length; ci++) {
+    setStatus(langCode, 'Chunk ' + (ci+1) + ' of ' + chunks.length + '...');
+    const rows = chunks[ci].map(l => parseCSVRow(l));
+    const payload = rows.map((row, ri) => ({ i: ri, blockId: row[0]||'', en: row[enIdx]||'', existing: row[langIdx]||'' }));
+    try {
+      const translations = await callAPI(payload, langCode, m);
+      rows.forEach((row, ri) => {
+        const newRow = [...row];
+        newRow[langIdx] = translations[ri] !== undefined ? translations[ri] : row[langIdx];
+        outputRows[ci * CHUNK + ri] = newRow;
+      });
+      completed++;
+      const pct = Math.round((completed / chunks.length) * 100);
+      document.getElementById('bar-' + langCode).style.width = pct + '%';
+      document.getElementById('pct-' + langCode).textContent = pct + '%';
+    } catch(err) {
+      setStatus(langCode, 'Error: ' + err.message, true);
+      return null;
+    }
+  }
+  document.getElementById('bar-' + langCode).classList.add('complete');
+  setStatus(langCode, 'Complete — ' + data.length + ' rows translated.');
+  const { meta: metaLines, header } = parsedCSV;
+  const outLines = [...metaLines, header, ...outputRows.filter(Boolean).map(row => row.map(escapeCSV).join(','))];
+  return outLines.join('\n');
+}
+
+function setStatus(langCode, msg, isError) {
+  const el = document.getElementById('status-' + langCode);
+  el.textContent = msg;
+  el.className = 'status-line' + (isError ? ' error' : '');
+}
+
+async function callAPI(rows, langCode, langMeta) {
+  const prompt = buildPrompt(rows, langCode, langMeta);
+  if (provider === 'anthropic') {
+    const resp = await fetch('https://api.anthropic.com/v1/messages', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json', 'x-api-key': apiKey, 'anthropic-version': '2023-06-01' },
+      body: JSON.stringify({ model: 'claude-opus-4-5', max_tokens: 8000, messages: [{ role: 'user', content: prompt }] })
+    });
+    const data = await resp.json();
+    if (!resp.ok) throw new Error(data.error?.message || 'HTTP ' + resp.status);
+    return parseTranslationResponse(data.content.find(b => b.type === 'text')?.text || '');
+  } else {
+    const resp = await fetch('https://api.openai.com/v1/chat/completions', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json', 'Authorization': 'Bearer ' + apiKey },
+      body: JSON.stringify({ model: 'gpt-4o', max_tokens: 8000, messages: [{ role: 'user', content: prompt }] })
+    });
+    const data = await resp.json();
+    if (!resp.ok) throw new Error(data.error?.message || 'HTTP ' + resp.status);
+    return parseTranslationResponse(data.choices?.[0]?.message?.content || '');
+  }
+}
+
+function buildPrompt(rows, langCode, langMeta) {
+  return 'You are a professional translator for Coravin, a premium wine by-the-glass system brand. Translate email marketing copy from English into ' + langMeta.name + '.\n\nCORAVIN BRAND VOICE:\n- Passionate, unpretentious, welcoming. Wine lover talking to wine lovers.\n- Lead with customer benefits, not specs. Short, direct sentences.\n- Avoid: "wine preservation", "connoisseur", "aficionado", "gamechanger", em dashes.\n- Use: "wine by-the-glass system", "wine lover", "pour", "pioneering technology".\n- Product names are fixed: Coravin, Pivot+, Pivot Stopper, Timeless, Pure Argon Capsules.\n- In German only: "capsules" = "Patronen".\n- CTAs should be action-oriented and conversion-focused.\n\nTRANSLATION RULES:\n- ' + langMeta.tone + '\n- No em dashes. Follow local capitalization standards for ' + langMeta.name + '.\n- Do not translate literally when a more natural marketing phrasing works better.\n- Preserve ALL HTML tags, attributes, inline CSS, image paths, Klaviyo merge tags ({{...}}, {%...%}), tracking parameters.\n- Update coravin.com URLs to ' + langMeta.domain + ' (domain only, preserve full path and query string).\n- If existing translation is present, use as reference and improve where needed.\n- If a cell is non-translatable (brand name only, URL only, empty), return unchanged.\n\nINPUT:\n' + JSON.stringify(rows.map(r => ({ i: r.i, blockId: r.blockId, en: r.en, existing: r.existing }))) + '\n\nOUTPUT: Respond ONLY with a valid JSON array. Format: [{"i": 0, "t": "..."}]. One object per input row. No markdown, no preamble.';
+}
+
+function parseTranslationResponse(text) {
+  const results = {};
+  try {
+    const clean = text.trim().replace(/^```json\s*/,'').replace(/\s*```$/,'').trim();
+    JSON.parse(clean).forEach(item => { results[item.i] = item.t; });
+  } catch(e) {
+    for (const m of text.matchAll(/"i"\s*:\s*(\d+)\s*,\s*"t"\s*:\s*"((?:[^"\\]|\\.)*)"/g)) {
+      results[parseInt(m[1])] = m[2].replace(/\\"/g,'"').replace(/\\n/g,'\n');
+    }
+  }
+  return results;
+}
+
+function addDownloadButton(langCode) {
+  const m = LANG_META[langCode];
+  const btn = document.createElement('button');
+  btn.className = 'dl-btn';
+  btn.innerHTML = '<span>' + m.flag + ' ' + m.name + '</span><svg viewBox="0 0 24 24" stroke-width="1.5"><path stroke-linecap="round" stroke-linejoin="round" d="M3 16.5v2.25A2.25 2.25 0 005.25 21h13.5A2.25 2.25 0 0021 18.75V16.5M16.5 12L12 16.5m0 0L7.5 12m4.5 4.5V3"/></svg>';
+  btn.addEventListener('click', () => {
+    const a = Object.assign(document.createElement('a'), { href: URL.createObjectURL(new Blob([results[langCode]], { type: 'text/csv;charset=utf-8;' })), download: 'translated_' + langCode + '_' + Date.now() + '.csv' });
+    a.click();
+  });
+  document.getElementById('dlGrid').appendChild(btn);
+}
+
+function parseCSVRow(line) {
+  if (!line) return [];
+  const result = []; let cur = '', inQ = false;
+  for (let i = 0; i < line.length; i++) {
+    const c = line[i];
+    if (c === '"') { if (inQ && line[i+1] === '"') { cur += '"'; i++; } else inQ = !inQ; }
+    else if (c === ',' && !inQ) { result.push(cur); cur = ''; }
+    else if (c === '\r' && !inQ) { continue; }
+    else cur += c;
+  }
+  result.push(cur);
+  return result;
+}
+
+function escapeCSV(val) {
+  const s = String(val ?? '');
+  return (s.includes(',') || s.includes('"') || s.includes('\n') || s.includes('\r')) ? '"' + s.replace(/"/g, '""') + '"' : s;
+}
+</script>
+</body>
+</html>
