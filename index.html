@@ -174,7 +174,7 @@ let parsedCSV = null;
 let detectedLangs = [];
 let selectedLangs = new Set();
 
-
+// ── Provider tabs ──
 document.querySelectorAll('.api-tab').forEach(tab => {
   tab.addEventListener('click', () => {
     document.querySelectorAll('.api-tab').forEach(t => t.classList.remove('active'));
@@ -198,6 +198,7 @@ document.getElementById('toggleKey').addEventListener('click', () => {
   inp.type = inp.type === 'password' ? 'text' : 'password';
 });
 
+// ── File drop / upload ──
 const dropZone = document.getElementById('dropZone');
 const fileInput = document.getElementById('fileInput');
 dropZone.addEventListener('click', () => fileInput.click());
@@ -212,51 +213,43 @@ function loadFile(file) {
   reader.readAsText(file, 'UTF-8');
 }
 
+// ── CSV parsing ──
+// Klaviyo Simple CSV: UTF-8 with BOM, CRLF, no directives
+// Header: block_id, source, [lang codes...]
 function parseAndDetect(fname) {
-  // Split off Smartling meta comment lines first (before CSV parsing)
-  const trailingNewline = csvText.endsWith('\n') || csvText.endsWith('\r\n');
-  // Split preserving \r so we can detect line endings per-section
-  const rawLines = csvText.split('\n');
-  const meta = [];
-  let metaBlock = '';
-  let csvBody = '';
-  for (const line of rawLines) {
-    if (line.startsWith('#')) {
-      // Preserve the original line including any \r
-      metaBlock += line + '\n';
-      meta.push(line.replace(/\r$/, ''));
-    } else {
-      csvBody += line + '\n';
-    }
-  }
-  // Detect line ending from data rows only (not meta lines)
-  const lineEnding = csvBody.includes('\r\n') || csvBody.split('\n').some(l => l.endsWith('\r')) ? '\r\n' : '\n';
+  // Strip BOM if present
+  const text = csvText.startsWith('\uFEFF') ? csvText.slice(1) : csvText;
 
-  // Parse the CSV body properly, handling quoted multi-line fields
-  const allRows = parseFullCSV(csvBody);
+  // Detect line ending and trailing newline from raw text
+  const lineEnding = text.includes('\r\n') ? '\r\n' : '\n';
+  const trailingNewline = text.endsWith('\r\n') || text.endsWith('\n');
+
+  // Parse full CSV (handles quoted multi-line fields)
+  const allRows = parseFullCSV(text);
   if (allRows.length < 2) { showFileError(fname, 'No data rows found.'); return; }
 
   const headers = allRows[0];
   const dataRows = allRows.slice(1).filter(r => r.some(c => c.trim()));
 
-  const enIdx = headers.indexOf('en');
-  if (enIdx === -1) { showFileError(fname, 'No "en" column found. Is this a Smartling export?'); return; }
-  const found = headers.filter(h => h !== 'en' && h !== 'block_id' && h.length === 2 && LANG_META[h]);
+  // Validate required columns
+  if (!headers.includes('block_id')) { showFileError(fname, 'Missing block_id column. Is this a Klaviyo Simple CSV export?'); return; }
+  if (!headers.includes('source')) { showFileError(fname, 'Missing source column. Please export using the Simple CSV option in Klaviyo.'); return; }
+
+  const sourceIdx = headers.indexOf('source');
+
+  // Detect language columns — anything that isn't block_id or source and is in LANG_META
+  const found = headers.filter(h => h !== 'block_id' && h !== 'source' && LANG_META[h]);
   if (found.length === 0) { showFileError(fname, 'No supported language columns found (nl, fr, de, it, es).'); return; }
 
-  // Reconstruct header line — rename 'en' to 'source' as required by Klaviyo import
-  const outputHeaders = headers.map(h => h === 'en' ? 'source' : h);
-  const headerLine = outputHeaders.map(escapeCSV).join(',');
-
-  parsedCSV = { meta, metaBlock, header: headerLine, headers, dataRows, enIdx, lineEnding, trailingNewline };
+  parsedCSV = { headers, dataRows, sourceIdx, lineEnding, trailingNewline };
   detectedLangs = found;
   selectedLangs = new Set(found);
+
   showFileOk(fname, dataRows.length + ' rows · ' + found.length + ' language' + (found.length > 1 ? 's' : '') + ' detected');
   renderLangPills();
   checkReady();
 }
 
-// Full CSV parser that handles quoted fields containing newlines and commas
 function parseFullCSV(text) {
   const rows = [];
   let row = [], cur = '', inQ = false;
@@ -337,6 +330,7 @@ function checkReady() {
   document.getElementById('runBtn').disabled = !(apiKey && parsedCSV && selectedLangs.size > 0);
 }
 
+// ── Translation ──
 document.getElementById('runBtn').addEventListener('click', runAll);
 
 async function runAll() {
@@ -346,8 +340,7 @@ async function runAll() {
   document.getElementById('progressBlocks').innerHTML = '';
   document.getElementById('progressSection').classList.add('visible');
 
-  const { metaBlock, header, dataRows, lineEnding, trailingNewline } = parsedCSV;
-  // Deep copy so original parsedCSV is not mutated between runs
+  const { headers, dataRows, lineEnding, trailingNewline } = parsedCSV;
   const sharedRows = dataRows.map(r => [...r]);
 
   let allOk = true;
@@ -357,9 +350,12 @@ async function runAll() {
   }
 
   if (allOk) {
-    const dataLines = [header, ...sharedRows.map(row => row.map(escapeCSV).join(','))].join(lineEnding);
-    const mergedCSV = metaBlock + dataLines + (trailingNewline ? lineEnding : '');
-    addSingleDownloadButton(mergedCSV);
+    // Output Simple CSV: UTF-8 with BOM, CRLF, header row, data rows
+    // Preserve original structure exactly — only translated cells change
+    const headerLine = headers.join(',');
+    const dataSection = [headerLine, ...sharedRows.map(row => row.map(escapeCSV).join(','))].join(lineEnding);
+    const csvContent = '\uFEFF' + dataSection + (trailingNewline ? lineEnding : '');
+    addDownloadButton(csvContent);
     document.getElementById('downloadsSection').classList.add('visible');
   }
 
@@ -368,39 +364,30 @@ async function runAll() {
 
 async function translateIntoRows(langCode, sharedRows) {
   const m = LANG_META[langCode];
-  const { headers, dataRows, enIdx } = parsedCSV;
+  const { headers, sourceIdx } = parsedCSV;
   const langIdx = headers.indexOf(langCode);
+
   const block = document.createElement('div');
   block.className = 'progress-lang-block';
-  block.innerHTML = '<div class="progress-lang-header"><span class="progress-lang-name">' + m.flag + ' ' + m.name + '</span><span class="progress-pct" id="pct-' + langCode + '">0%</span></div><div class="progress-track"><div class="progress-fill" id="bar-' + langCode + '"></div></div><div class="status-line" id="status-' + langCode + '">Starting...</div>';
+  block.innerHTML = '<div class="progress-lang-header"><span class="progress-lang-name">' + m.flag + ' ' + m.name + '</span><span class="progress-pct" id="pct-' + langCode + '">0%</span></div><div class="progress-track"><div class="progress-fill" id="bar-' + langCode + '"></div></div><div class="status-line" id="status-' + langCode + '">Translating...</div>';
   document.getElementById('progressBlocks').appendChild(block);
-  const CHUNK = 8;
-  const chunks = [];
-  for (let i = 0; i < sharedRows.length; i += CHUNK) chunks.push({ start: i, rows: sharedRows.slice(i, i + CHUNK) });
-  let completed = 0;
-  for (let ci = 0; ci < chunks.length; ci++) {
-    const { start, rows } = chunks[ci];
-    setStatus(langCode, 'Chunk ' + (ci+1) + ' of ' + chunks.length + '...');
-    const payload = rows.map((row, ri) => ({ i: ri, blockId: row[0]||'', en: row[enIdx]||'', existing: row[langIdx]||'' }));
-    try {
-      const translations = await callAPI(payload, langCode, m);
-      rows.forEach((row, ri) => {
-        if (translations[ri] !== undefined) {
-          sharedRows[start + ri][langIdx] = enforceURLs(translations[ri], m.domain);
-        }
-      });
-      completed++;
-      const pct = Math.round((completed / chunks.length) * 100);
-      document.getElementById('bar-' + langCode).style.width = pct + '%';
-      document.getElementById('pct-' + langCode).textContent = pct + '%';
-    } catch(err) {
-      setStatus(langCode, 'Error: ' + err.message, true);
-      return false;
-    }
+
+  // Send all rows in one API call — emails fit comfortably within model context limits
+  const payload = sharedRows.map((row, i) => ({ i, blockId: row[0]||'', source: row[sourceIdx]||'', existing: row[langIdx]||'' }));
+  try {
+    const translations = await callAPI(payload, langCode, m);
+    sharedRows.forEach((row, i) => {
+      if (translations[i] !== undefined) sharedRows[i][langIdx] = enforceURLs(translations[i], m.domain);
+    });
+    document.getElementById('bar-' + langCode).style.width = '100%';
+    document.getElementById('pct-' + langCode).textContent = '100%';
+    document.getElementById('bar-' + langCode).classList.add('complete');
+    setStatus(langCode, 'Complete.');
+    return true;
+  } catch(err) {
+    setStatus(langCode, 'Error: ' + err.message, true);
+    return false;
   }
-  document.getElementById('bar-' + langCode).classList.add('complete');
-  setStatus(langCode, 'Complete.');
-  return true;
 }
 
 function setStatus(langCode, msg, isError) {
@@ -410,12 +397,11 @@ function setStatus(langCode, msg, isError) {
 }
 
 async function callAPI(rows, langCode, langMeta) {
-  const prompt = buildPrompt(rows, langCode, langMeta);
   if (provider === 'anthropic') {
     const resp = await fetch('https://api.anthropic.com/v1/messages', {
       method: 'POST',
       headers: { 'Content-Type': 'application/json', 'x-api-key': apiKey, 'anthropic-version': '2023-06-01' },
-      body: JSON.stringify({ model: 'claude-opus-4-5', max_tokens: 8000, messages: [{ role: 'user', content: prompt }] })
+      body: JSON.stringify({ model: 'claude-opus-4-5', max_tokens: 128000, messages: [{ role: 'user', content: buildPrompt(rows, langCode, langMeta) }] })
     });
     const data = await resp.json();
     if (!resp.ok) throw new Error(data.error?.message || 'HTTP ' + resp.status);
@@ -424,7 +410,7 @@ async function callAPI(rows, langCode, langMeta) {
     const resp = await fetch('https://api.openai.com/v1/chat/completions', {
       method: 'POST',
       headers: { 'Content-Type': 'application/json', 'Authorization': 'Bearer ' + apiKey },
-      body: JSON.stringify({ model: 'gpt-5.4', max_completion_tokens: 8000, messages: [{ role: 'user', content: prompt }] })
+      body: JSON.stringify({ model: 'gpt-5.4', max_completion_tokens: 128000, messages: [{ role: 'user', content: buildPrompt(rows, langCode, langMeta) }] })
     });
     const data = await resp.json();
     if (!resp.ok) throw new Error(data.error?.message || 'HTTP ' + resp.status);
@@ -433,7 +419,7 @@ async function callAPI(rows, langCode, langMeta) {
 }
 
 function buildPrompt(rows, langCode, langMeta) {
-  return 'You are a professional translator for Coravin, a premium wine by-the-glass system brand. Translate email marketing copy from English into ' + langMeta.name + '.\n\nCORAVIN BRAND VOICE:\n- Passionate, unpretentious, welcoming. Wine lover talking to wine lovers.\n- Lead with customer benefits, not specs. Short, direct sentences.\n- Avoid: "wine preservation", "connoisseur", "aficionado", "gamechanger", em dashes.\n- Use: "wine by-the-glass system", "wine lover", "pour", "pioneering technology".\n- Product names are fixed: Coravin, Pivot+, Pivot Stopper, Timeless, Pure Argon Capsules.\n- In German only: "capsules" = "Patronen".\n- CTAs should be action-oriented and conversion-focused.\n\nTRANSLATION RULES:\n- ' + langMeta.tone + '\n- No em dashes. Follow local capitalization standards for ' + langMeta.name + '.\n- Do not translate literally when a more natural marketing phrasing works better.\n- Preserve ALL HTML tags, attributes, inline CSS, image paths, Klaviyo merge tags ({{...}}, {%...%}), tracking parameters.\n- If existing translation is present, use as reference and improve where needed.\n- If a cell is non-translatable (brand name only, URL only, empty), return unchanged.\n\nINPUT:\n' + JSON.stringify(rows.map(r => ({ i: r.i, blockId: r.blockId, en: r.en, existing: r.existing }))) + '\n\nOUTPUT: Respond ONLY with a valid JSON array. Format: [{"i": 0, "t": "..."}]. One object per input row. No markdown, no preamble.';
+  return 'You are a professional translator for Coravin, a premium wine by-the-glass system brand. Translate email marketing copy from English into ' + langMeta.name + '.\n\nCORAVIN BRAND VOICE:\n- Passionate, unpretentious, welcoming. Wine lover talking to wine lovers.\n- Lead with customer benefits, not specs. Short, direct sentences.\n- Avoid: "wine preservation", "connoisseur", "aficionado", "gamechanger", em dashes.\n- Use: "wine by-the-glass system", "wine lover", "pour", "pioneering technology".\n- Product names are fixed: Coravin, Pivot+, Pivot Stopper, Timeless, Pure Argon Capsules.\n- In German only: "capsules" = "Patronen".\n- CTAs should be action-oriented and conversion-focused.\n\nTRANSLATION RULES:\n- ' + langMeta.tone + '\n- No em dashes. Follow local capitalisation standards for ' + langMeta.name + '.\n- Do not translate literally when a more natural marketing phrasing works better.\n- Preserve ALL HTML tags, attributes, inline CSS, image paths, Klaviyo merge tags ({{...}}, {%...%}), tracking parameters. Translate only visible user-facing text within the HTML.\n- If existing translation is present, use as reference and improve where needed.\n- If a cell is non-translatable (brand name only, URL only, empty), return it unchanged.\n- Be consistent with product and part names throughout the entire email (e.g. always use the same word for \'needle\', \'capsule\', etc.).\n\nINPUT:\n' + JSON.stringify(rows.map(r => ({ i: r.i, blockId: r.blockId, source: r.source, existing: r.existing }))) + '\n\nOUTPUT: Respond ONLY with a valid JSON array. Format: [{"i": 0, "t": "..."}]. One object per input row. No markdown, no preamble.';
 }
 
 function parseTranslationResponse(text) {
@@ -449,37 +435,20 @@ function parseTranslationResponse(text) {
   return results;
 }
 
-function addSingleDownloadButton(csvContent) {
+function enforceURLs(text, targetDomain) {
+  return text.replace(/coravin\.com(?!\.es)(?=[/?'"\s]|$)/g, targetDomain);
+}
+
+function addDownloadButton(csvContent) {
   const btn = document.createElement('button');
   btn.className = 'dl-btn';
   btn.innerHTML = '<span>Download translated CSV</span><svg viewBox="0 0 24 24" stroke-width="1.5"><path stroke-linecap="round" stroke-linejoin="round" d="M3 16.5v2.25A2.25 2.25 0 005.25 21h13.5A2.25 2.25 0 0021 18.75V16.5M16.5 12L12 16.5m0 0L7.5 12m4.5 4.5V3"/></svg>';
   btn.addEventListener('click', () => {
-    const a = Object.assign(document.createElement('a'), {
-      href: URL.createObjectURL(new Blob([csvContent], { type: 'text/csv;charset=utf-8;' })),
-      download: 'translated_all_' + Date.now() + '.csv'
-    });
+    const blob = new Blob([csvContent], { type: 'text/csv;charset=utf-8;' });
+    const a = Object.assign(document.createElement('a'), { href: URL.createObjectURL(blob), download: 'translated_' + Date.now() + '.csv' });
     a.click();
   });
   document.getElementById('dlGrid').appendChild(btn);
-}
-
-function enforceURLs(text, targetDomain) {
-  // Replace any coravin.com (but not already-localised domains) with the target domain
-  return text.replace(/coravin\.com(?!\.es)(?=[/?"]|$)/g, targetDomain);
-}
-
-function parseCSVRow(line) {
-  if (!line) return [];
-  const result = []; let cur = '', inQ = false;
-  for (let i = 0; i < line.length; i++) {
-    const c = line[i];
-    if (c === '"') { if (inQ && line[i+1] === '"') { cur += '"'; i++; } else inQ = !inQ; }
-    else if (c === ',' && !inQ) { result.push(cur); cur = ''; }
-    else if (c === '\r' && !inQ) { continue; }
-    else cur += c;
-  }
-  result.push(cur);
-  return result;
 }
 
 function escapeCSV(val) {
@@ -487,5 +456,6 @@ function escapeCSV(val) {
   return (s.includes(',') || s.includes('"') || s.includes('\n') || s.includes('\r')) ? '"' + s.replace(/"/g, '""') + '"' : s;
 }
 </script>
+
 </body>
 </html>
