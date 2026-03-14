@@ -110,7 +110,7 @@ input[type="file"] { display: none; }
     <span class="section-label">API key</span>
     <div class="api-tabs">
       <button class="api-tab active" data-provider="anthropic">Anthropic (Claude)</button>
-      <button class="api-tab" data-provider="openai">OpenAI (GPT-4o)</button>
+      <button class="api-tab" data-provider="openai">OpenAI (GPT-5.4)</button>
     </div>
     <div class="api-input-wrap">
       <input class="api-input" id="apiKey" type="password" placeholder="Paste your API key here" autocomplete="off">
@@ -373,7 +373,9 @@ async function translateIntoRows(langCode, sharedRows) {
     try {
       const translations = await callAPI(payload, langCode, m);
       rows.forEach((row, ri) => {
-        if (translations[ri] !== undefined) sharedRows[start + ri][langIdx] = translations[ri];
+        if (translations[ri] !== undefined) {
+          sharedRows[start + ri][langIdx] = enforceURLs(translations[ri], m.domain);
+        }
       });
       completed++;
       const pct = Math.round((completed / chunks.length) * 100);
@@ -410,7 +412,7 @@ async function callAPI(rows, langCode, langMeta) {
     const resp = await fetch('https://api.openai.com/v1/chat/completions', {
       method: 'POST',
       headers: { 'Content-Type': 'application/json', 'Authorization': 'Bearer ' + apiKey },
-      body: JSON.stringify({ model: 'gpt-4o', max_tokens: 8000, messages: [{ role: 'user', content: prompt }] })
+      body: JSON.stringify({ model: 'gpt-5.4', max_tokens: 8000, messages: [{ role: 'user', content: prompt }] })
     });
     const data = await resp.json();
     if (!resp.ok) throw new Error(data.error?.message || 'HTTP ' + resp.status);
@@ -419,7 +421,7 @@ async function callAPI(rows, langCode, langMeta) {
 }
 
 function buildPrompt(rows, langCode, langMeta) {
-  return 'You are a professional translator for Coravin, a premium wine by-the-glass system brand. Translate email marketing copy from English into ' + langMeta.name + '.\n\nCORAVIN BRAND VOICE:\n- Passionate, unpretentious, welcoming. Wine lover talking to wine lovers.\n- Lead with customer benefits, not specs. Short, direct sentences.\n- Avoid: "wine preservation", "connoisseur", "aficionado", "gamechanger", em dashes.\n- Use: "wine by-the-glass system", "wine lover", "pour", "pioneering technology".\n- Product names are fixed: Coravin, Pivot+, Pivot Stopper, Timeless, Pure Argon Capsules.\n- In German only: "capsules" = "Patronen".\n- CTAs should be action-oriented and conversion-focused.\n\nTRANSLATION RULES:\n- ' + langMeta.tone + '\n- No em dashes. Follow local capitalization standards for ' + langMeta.name + '.\n- Do not translate literally when a more natural marketing phrasing works better.\n- Preserve ALL HTML tags, attributes, inline CSS, image paths, Klaviyo merge tags ({{...}}, {%...%}), tracking parameters.\n- Update coravin.com URLs to ' + langMeta.domain + ' (domain only, preserve full path and query string).\n- If existing translation is present, use as reference and improve where needed.\n- If a cell is non-translatable (brand name only, URL only, empty), return unchanged.\n\nINPUT:\n' + JSON.stringify(rows.map(r => ({ i: r.i, blockId: r.blockId, en: r.en, existing: r.existing }))) + '\n\nOUTPUT: Respond ONLY with a valid JSON array. Format: [{"i": 0, "t": "..."}]. One object per input row. No markdown, no preamble.';
+  return 'You are a professional translator for Coravin, a premium wine by-the-glass system brand. Translate email marketing copy from English into ' + langMeta.name + '.\n\nCORAVIN BRAND VOICE:\n- Passionate, unpretentious, welcoming. Wine lover talking to wine lovers.\n- Lead with customer benefits, not specs. Short, direct sentences.\n- Avoid: "wine preservation", "connoisseur", "aficionado", "gamechanger", em dashes.\n- Use: "wine by-the-glass system", "wine lover", "pour", "pioneering technology".\n- Product names are fixed: Coravin, Pivot+, Pivot Stopper, Timeless, Pure Argon Capsules.\n- In German only: "capsules" = "Patronen".\n- CTAs should be action-oriented and conversion-focused.\n\nTRANSLATION RULES:\n- ' + langMeta.tone + '\n- No em dashes. Follow local capitalization standards for ' + langMeta.name + '.\n- Do not translate literally when a more natural marketing phrasing works better.\n- Preserve ALL HTML tags, attributes, inline CSS, image paths, Klaviyo merge tags ({{...}}, {%...%}), tracking parameters.\n- If existing translation is present, use as reference and improve where needed.\n- If a cell is non-translatable (brand name only, URL only, empty), return unchanged.\n\nINPUT:\n' + JSON.stringify(rows.map(r => ({ i: r.i, blockId: r.blockId, en: r.en, existing: r.existing }))) + '\n\nOUTPUT: Respond ONLY with a valid JSON array. Format: [{"i": 0, "t": "..."}]. One object per input row. No markdown, no preamble.';
 }
 
 function parseTranslationResponse(text) {
@@ -447,6 +449,11 @@ function addSingleDownloadButton(csvContent) {
     a.click();
   });
   document.getElementById('dlGrid').appendChild(btn);
+}
+
+function enforceURLs(text, targetDomain) {
+  // Replace any coravin.com (but not already-localised domains) with the target domain
+  return text.replace(/coravin\.com(?!\.es)(?=[/?"]|$)/g, targetDomain);
 }
 
 function parseCSVRow(line) {
