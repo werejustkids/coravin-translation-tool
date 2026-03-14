@@ -214,15 +214,23 @@ function loadFile(file) {
 
 function parseAndDetect(fname) {
   // Split off Smartling meta comment lines first (before CSV parsing)
-  const lineEnding = csvText.includes('\r\n') ? '\r\n' : '\n';
   const trailingNewline = csvText.endsWith('\n') || csvText.endsWith('\r\n');
+  // Split preserving \r so we can detect line endings per-section
   const rawLines = csvText.split('\n');
   const meta = [];
+  let metaBlock = '';
   let csvBody = '';
   for (const line of rawLines) {
-    if (line.startsWith('#')) { meta.push(line); }
-    else { csvBody += line + '\n'; }
+    if (line.startsWith('#')) {
+      // Preserve the original line including any \r
+      metaBlock += line + '\n';
+      meta.push(line.replace(/\r$/, ''));
+    } else {
+      csvBody += line + '\n';
+    }
   }
+  // Detect line ending from data rows only (not meta lines)
+  const lineEnding = csvBody.includes('\r\n') || csvBody.split('\n').some(l => l.endsWith('\r')) ? '\r\n' : '\n';
 
   // Parse the CSV body properly, handling quoted multi-line fields
   const allRows = parseFullCSV(csvBody);
@@ -239,7 +247,7 @@ function parseAndDetect(fname) {
   // Reconstruct header line preserving original exactly
   const headerLine = headers.map(escapeCSV).join(',');
 
-  parsedCSV = { meta, header: headerLine, headers, dataRows, enIdx, lineEnding, trailingNewline };
+  parsedCSV = { meta, metaBlock, header: headerLine, headers, dataRows, enIdx, lineEnding, trailingNewline };
   detectedLangs = found;
   selectedLangs = new Set(found);
   showFileOk(fname, dataRows.length + ' rows · ' + found.length + ' language' + (found.length > 1 ? 's' : '') + ' detected');
@@ -337,7 +345,7 @@ async function runAll() {
   document.getElementById('progressBlocks').innerHTML = '';
   document.getElementById('progressSection').classList.add('visible');
 
-  const { meta: metaLines, header, dataRows, lineEnding, trailingNewline } = parsedCSV;
+  const { metaBlock, header, dataRows, lineEnding, trailingNewline } = parsedCSV;
   // Deep copy so original parsedCSV is not mutated between runs
   const sharedRows = dataRows.map(r => [...r]);
 
@@ -348,7 +356,8 @@ async function runAll() {
   }
 
   if (allOk) {
-    const mergedCSV = [...metaLines, header, ...sharedRows.map(row => row.map(escapeCSV).join(','))].join(lineEnding) + (trailingNewline ? lineEnding : '');
+    const dataLines = [header, ...sharedRows.map(row => row.map(escapeCSV).join(','))].join(lineEnding);
+    const mergedCSV = metaBlock + dataLines + (trailingNewline ? lineEnding : '');
     addSingleDownloadButton(mergedCSV);
     document.getElementById('downloadsSection').classList.add('visible');
   }
