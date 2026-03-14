@@ -214,6 +214,8 @@ function loadFile(file) {
 
 function parseAndDetect(fname) {
   // Split off Smartling meta comment lines first (before CSV parsing)
+  const lineEnding = csvText.includes('\r\n') ? '\r\n' : '\n';
+  const trailingNewline = csvText.endsWith('\n') || csvText.endsWith('\r\n');
   const rawLines = csvText.split('\n');
   const meta = [];
   let csvBody = '';
@@ -237,7 +239,7 @@ function parseAndDetect(fname) {
   // Reconstruct header line preserving original exactly
   const headerLine = headers.map(escapeCSV).join(',');
 
-  parsedCSV = { meta, header: headerLine, headers, dataRows, enIdx };
+  parsedCSV = { meta, header: headerLine, headers, dataRows, enIdx, lineEnding, trailingNewline };
   detectedLangs = found;
   selectedLangs = new Set(found);
   showFileOk(fname, dataRows.length + ' rows · ' + found.length + ' language' + (found.length > 1 ? 's' : '') + ' detected');
@@ -335,7 +337,7 @@ async function runAll() {
   document.getElementById('progressBlocks').innerHTML = '';
   document.getElementById('progressSection').classList.add('visible');
 
-  const { meta: metaLines, header, dataRows } = parsedCSV;
+  const { meta: metaLines, header, dataRows, lineEnding, trailingNewline } = parsedCSV;
   // Deep copy so original parsedCSV is not mutated between runs
   const sharedRows = dataRows.map(r => [...r]);
 
@@ -346,7 +348,7 @@ async function runAll() {
   }
 
   if (allOk) {
-    const mergedCSV = [...metaLines, header, ...sharedRows.map(row => row.map(escapeCSV).join(','))].join('\n');
+    const mergedCSV = [...metaLines, header, ...sharedRows.map(row => row.map(escapeCSV).join(','))].join(lineEnding) + (trailingNewline ? lineEnding : '');
     addSingleDownloadButton(mergedCSV);
     document.getElementById('downloadsSection').classList.add('visible');
   }
