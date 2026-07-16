@@ -201,7 +201,7 @@ input[type="file"] { display: none; }
   <div class="section">
     <span class="section-label">API key</span>
     <div class="api-tabs">
-      <button class="api-tab active" data-provider="openai">OpenAI (GPT-5.4)</button>
+      <button class="api-tab active" data-provider="openai">OpenAI (GPT-5.5)</button>
       <button class="api-tab" data-provider="anthropic">Anthropic (Claude)</button>
     </div>
     <div class="api-input-wrap">
@@ -502,7 +502,7 @@ async function callAPI(rows, langCode, langMeta) {
     const resp = await fetch('https://api.openai.com/v1/chat/completions', {
       method: 'POST',
       headers: { 'Content-Type': 'application/json', 'Authorization': 'Bearer ' + apiKey },
-      body: JSON.stringify({ model: 'gpt-5.4', max_completion_tokens: 128000, messages: [{ role: 'user', content: buildPrompt(rows, langCode, langMeta) }] })
+      body: JSON.stringify({ model: 'gpt-5.5', max_completion_tokens: 128000, messages: [{ role: 'user', content: buildPrompt(rows, langCode, langMeta) }] })
     });
     const data = await resp.json();
     if (!resp.ok) throw new Error(data.error?.message || 'HTTP ' + resp.status);
